@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Entry {
   id: string;
@@ -12,6 +15,9 @@ interface Entry {
   amount: number;
   type: 'sales' | 'delivery';
   category: 'Training' | 'Coaching' | 'Speaking';
+  title: string;
+  content?: string;
+  user_id: string;
 }
 
 interface DayData {
@@ -21,10 +27,37 @@ interface DayData {
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [entries, setEntries] = useState<Entry[]>([]);
   const [salesGoal, setSalesGoal] = useState<string>('');
   const [deliveryGoal, setDeliveryGoal] = useState<string>('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch entries from Supabase
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['entries'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('entries')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching entries:', error);
+        throw error;
+      }
+      
+      return data.map(entry => ({
+        id: entry.id,
+        date: entry.date,
+        amount: parseFloat(entry.content || '0'),
+        type: entry.title.toLowerCase().includes('sales') ? 'sales' as const : 'delivery' as const,
+        category: entry.title.split(' - ')[1] as 'Training' | 'Coaching' | 'Speaking' || 'Training',
+        title: entry.title,
+        content: entry.content,
+        user_id: entry.user_id
+      }));
+    },
+  });
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -87,16 +120,43 @@ const Calendar = () => {
     };
   };
 
-  const addEntry = (day: number, amount: number, type: 'sales' | 'delivery', category: string) => {
-    const newEntry: Entry = {
-      id: `${Date.now()}-${Math.random()}`,
-      date: getDateString(day),
-      amount,
-      type,
-      category: category as 'Training' | 'Coaching' | 'Speaking'
-    };
+  const addEntry = async (day: number, amount: number, type: 'sales' | 'delivery', category: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to add entries",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    setEntries(prev => [...prev, newEntry]);
+    const dateString = getDateString(day);
+    const title = `${type === 'sales' ? 'Sales' : 'Delivery'} - ${category}`;
+    
+    const { error } = await supabase
+      .from('entries')
+      .insert({
+        date: dateString,
+        title,
+        content: amount.toString(),
+        user_id: user.id
+      });
+
+    if (error) {
+      console.error('Error adding entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Refresh the entries
+    queryClient.invalidateQueries({ queryKey: ['entries'] });
+    
     toast({
       title: "Entry Added",
       description: `${type === 'sales' ? 'Sales' : 'Delivery'} of $${amount} added for ${category}`,
@@ -174,6 +234,16 @@ const Calendar = () => {
 
     return weeks;
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center">Loading calendar...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">

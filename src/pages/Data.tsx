@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 interface Entry {
   id: string;
@@ -13,36 +16,43 @@ interface Entry {
   amount: number;
   type: 'sales' | 'delivery';
   category: 'Training' | 'Coaching' | 'Speaking';
+  title: string;
+  content?: string;
+  user_id: string;
 }
 
 const Data = () => {
-  const [entries, setEntries] = useState<Entry[]>([
-    {
-      id: '1',
-      date: '2024-01-15',
-      amount: 2500,
-      type: 'sales',
-      category: 'Training'
-    },
-    {
-      id: '2',
-      date: '2024-01-15',
-      amount: 1800,
-      type: 'delivery',
-      category: 'Coaching'
-    },
-    {
-      id: '3',
-      date: '2024-01-14',
-      amount: 5000,
-      type: 'sales',
-      category: 'Speaking'
-    }
-  ]);
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Partial<Entry>>({});
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch entries from Supabase
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['entries'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('entries')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching entries:', error);
+        throw error;
+      }
+      
+      return data.map(entry => ({
+        id: entry.id,
+        date: entry.date,
+        amount: parseFloat(entry.content || '0'),
+        type: entry.title.toLowerCase().includes('sales') ? 'sales' as const : 'delivery' as const,
+        category: entry.title.split(' - ')[1] as 'Training' | 'Coaching' | 'Speaking' || 'Training',
+        title: entry.title,
+        content: entry.content,
+        user_id: entry.user_id
+      }));
+    },
+  });
 
   const sortedEntries = [...entries].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -58,24 +68,56 @@ const Data = () => {
     setEditingEntry({});
   };
 
-  const saveEdit = () => {
-    if (editingId && editingEntry) {
-      setEntries(prev => prev.map(entry => 
-        entry.id === editingId 
-          ? { ...entry, ...editingEntry } as Entry
-          : entry
-      ));
-      setEditingId(null);
-      setEditingEntry({});
+  const saveEdit = async () => {
+    if (!editingId || !editingEntry) return;
+
+    const title = `${editingEntry.type === 'sales' ? 'Sales' : 'Delivery'} - ${editingEntry.category}`;
+    
+    const { error } = await supabase
+      .from('entries')
+      .update({
+        date: editingEntry.date,
+        title,
+        content: editingEntry.amount?.toString()
+      })
+      .eq('id', editingId);
+
+    if (error) {
+      console.error('Error updating entry:', error);
       toast({
-        title: "Entry Updated",
-        description: "The entry has been successfully updated.",
+        title: "Error",
+        description: "Failed to update entry",
+        variant: "destructive",
       });
+      return;
     }
+
+    queryClient.invalidateQueries({ queryKey: ['entries'] });
+    setEditingId(null);
+    setEditingEntry({});
+    toast({
+      title: "Entry Updated",
+      description: "The entry has been successfully updated.",
+    });
   };
 
-  const deleteEntry = (id: string) => {
-    setEntries(prev => prev.filter(entry => entry.id !== id));
+  const deleteEntry = async (id: string) => {
+    const { error } = await supabase
+      .from('entries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['entries'] });
     toast({
       title: "Entry Deleted",
       description: "The entry has been successfully deleted.",
@@ -98,6 +140,16 @@ const Data = () => {
   };
 
   const totals = getTotalsByType();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center">Loading data...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">
