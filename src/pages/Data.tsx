@@ -10,6 +10,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+interface DbEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string | null;
+  date: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Entry {
   id: string;
   date: string;
@@ -31,7 +41,7 @@ const Data = () => {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['entries'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entries')
         .select('*')
         .order('date', { ascending: false });
@@ -41,7 +51,7 @@ const Data = () => {
         throw error;
       }
       
-      return data.map(entry => ({
+      return (data as DbEntry[]).map(entry => ({
         id: entry.id,
         date: entry.date,
         amount: parseFloat(entry.content || '0'),
@@ -73,7 +83,7 @@ const Data = () => {
 
     const title = `${editingEntry.type === 'sales' ? 'Sales' : 'Delivery'} - ${editingEntry.category}`;
     
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('entries')
       .update({
         date: editingEntry.date,
@@ -102,7 +112,7 @@ const Data = () => {
   };
 
   const deleteEntry = async (id: string) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('entries')
       .delete()
       .eq('id', id);

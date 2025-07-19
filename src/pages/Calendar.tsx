@@ -9,6 +9,16 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+interface DbEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string | null;
+  date: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Entry {
   id: string;
   date: string;
@@ -36,7 +46,7 @@ const Calendar = () => {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['entries'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entries')
         .select('*')
         .order('date', { ascending: false });
@@ -46,7 +56,7 @@ const Calendar = () => {
         throw error;
       }
       
-      return data.map(entry => ({
+      return (data as DbEntry[]).map(entry => ({
         id: entry.id,
         date: entry.date,
         amount: parseFloat(entry.content || '0'),
@@ -135,7 +145,7 @@ const Calendar = () => {
     const dateString = getDateString(day);
     const title = `${type === 'sales' ? 'Sales' : 'Delivery'} - ${category}`;
     
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('entries')
       .insert({
         date: dateString,
