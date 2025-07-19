@@ -61,6 +61,24 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				sales: {
+					DEFAULT: 'hsl(var(--sales))',
+					foreground: 'hsl(var(--sales-foreground))',
+					light: 'hsl(var(--sales-light))'
+				},
+				delivery: {
+					DEFAULT: 'hsl(var(--delivery))',
+					foreground: 'hsl(var(--delivery-foreground))',
+					light: 'hsl(var(--delivery-light))'
+				},
+				performance: {
+					DEFAULT: 'hsl(var(--performance))',
+					light: 'hsl(var(--performance-light))'
+				},
+				neutral: {
+					DEFAULT: 'hsl(var(--neutral))',
+					foreground: 'hsl(var(--neutral-foreground))'
 				}
 			},
 			borderRadius: {
