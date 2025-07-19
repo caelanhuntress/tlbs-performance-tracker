@@ -1,139 +1,362 @@
-import React, { useState } from 'react';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Plus } from 'lucide-react';
-import { useEntries } from '../context/EntriesContext';
-import { format } from 'date-fns';
+import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+
+interface Entry {
+  id: string;
+  date: string;
+  amount: number;
+  type: 'sales' | 'delivery';
+  category: 'Training' | 'Coaching' | 'Speaking';
+}
+
+interface DayData {
+  sales: number;
+  delivery: number;
+}
 
 const Calendar = () => {
-  const { entries, addEntry, loading } = useEntries();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newEntry, setNewEntry] = useState({ title: '', content: '' });
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [salesGoal, setSalesGoal] = useState<string>('');
+  const [deliveryGoal, setDeliveryGoal] = useState<string>('');
+  const { toast } = useToast();
 
-  // Get entries for selected date
-  const selectedDateEntries = selectedDate 
-    ? entries.filter(entry => entry.date === format(selectedDate, 'yyyy-MM-dd'))
-    : [];
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
-  const handleAddEntry = async () => {
-    if (!selectedDate || !newEntry.title.trim()) return;
+  const categories = ['Training', 'Coaching', 'Speaking'];
 
-    await addEntry({
-      date: format(selectedDate, 'yyyy-MM-dd'),
-      title: newEntry.title,
-      content: newEntry.content
-    });
-
-    setNewEntry({ title: '', content: '' });
-    setIsDialogOpen(false);
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getDateString = (day: number) => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  const getDayData = (day: number): DayData => {
+    const dateString = getDateString(day);
+    const dayEntries = entries.filter(entry => entry.date === dateString);
+    
+    return {
+      sales: dayEntries.filter(e => e.type === 'sales').reduce((sum, e) => sum + e.amount, 0),
+      delivery: dayEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0)
+    };
+  };
+
+  const getWeekData = (weekStart: number): DayData => {
+    let sales = 0;
+    let delivery = 0;
+    
+    for (let i = 0; i < 7; i++) {
+      const day = weekStart + i;
+      if (day > 0 && day <= getDaysInMonth(currentDate)) {
+        const dayData = getDayData(day);
+        sales += dayData.sales;
+        delivery += dayData.delivery;
+      }
+    }
+    
+    return { sales, delivery };
+  };
+
+  const getMonthTotals = (): DayData => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const monthEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate.getFullYear() === year && entryDate.getMonth() === month;
+    });
+
+    return {
+      sales: monthEntries.filter(e => e.type === 'sales').reduce((sum, e) => sum + e.amount, 0),
+      delivery: monthEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0)
+    };
+  };
+
+  const addEntry = (day: number, amount: number, type: 'sales' | 'delivery', category: string) => {
+    const newEntry: Entry = {
+      id: `${Date.now()}-${Math.random()}`,
+      date: getDateString(day),
+      amount,
+      type,
+      category: category as 'Training' | 'Coaching' | 'Speaking'
+    };
+
+    setEntries(prev => [...prev, newEntry]);
+    toast({
+      title: "Entry Added",
+      description: `${type === 'sales' ? 'Sales' : 'Delivery'} of $${amount} added for ${category}`,
+    });
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      if (direction === 'prev') {
+        newDate.setMonth(prev.getMonth() - 1);
+      } else {
+        newDate.setMonth(prev.getMonth() + 1);
+      }
+      return newDate;
+    });
+  };
+
+  const selectMonth = (monthIndex: number) => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(monthIndex);
+      return newDate;
+    });
+  };
+
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDay = getFirstDayOfMonth(currentDate);
+  const monthTotals = getMonthTotals();
+
+  const renderCalendarDays = () => {
+    const days = [];
+    const totalCells = Math.ceil((daysInMonth + firstDay) / 7) * 7;
+
+    for (let i = 0; i < totalCells; i++) {
+      const day = i - firstDay + 1;
+      const isValidDay = day > 0 && day <= daysInMonth;
+      
+      if (isValidDay) {
+        const dayData = getDayData(day);
+        days.push(
+          <DayCell
+            key={i}
+            day={day}
+            data={dayData}
+            onAddEntry={addEntry}
+          />
+        );
+      } else {
+        days.push(<div key={i} className="h-32"></div>);
+      }
+    }
+
+    return days;
+  };
+
+  const renderWeekTotals = () => {
+    const weeks = [];
+    const totalCells = Math.ceil((daysInMonth + firstDay) / 7) * 7;
+    
+    for (let week = 0; week < totalCells / 7; week++) {
+      const weekStart = week * 7 - firstDay + 1;
+      const weekData = getWeekData(weekStart);
+      
+      weeks.push(
+        <Card key={week} className="p-4 bg-performance-light">
+          <div className="text-sm font-medium text-center mb-2">Week {week + 1}</div>
+          <div className="space-y-1">
+            <div className="text-sales font-semibold">${weekData.sales.toLocaleString()}</div>
+            <div className="text-delivery font-semibold">${weekData.delivery.toLocaleString()}</div>
+          </div>
+        </Card>
+      );
+    }
+
+    return weeks;
+  };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Calendar */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CalendarComponent
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-            />
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Input
+                placeholder="Sales Goal"
+                value={salesGoal}
+                onChange={(e) => setSalesGoal(e.target.value)}
+                className="w-32"
+              />
+              <Input
+                placeholder="Delivery Goal"
+                value={deliveryGoal}
+                onChange={(e) => setDeliveryGoal(e.target.value)}
+                className="w-32"
+              />
+            </div>
+          </div>
 
-        {/* Selected Date Entries */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>
-              {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Select a date'}
-            </CardTitle>
-            {selectedDate && (
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Entry
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add New Entry</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="title">Title</Label>
-                      <Input
-                        id="title"
-                        value={newEntry.title}
-                        onChange={(e) => setNewEntry(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="Entry title"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="content">Content</Label>
-                      <Textarea
-                        id="content"
-                        value={newEntry.content}
-                        onChange={(e) => setNewEntry(prev => ({ ...prev, content: e.target.value }))}
-                        placeholder="Entry content (optional)"
-                        rows={4}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleAddEntry} disabled={!newEntry.title.trim()}>
-                        Add Entry
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </CardHeader>
-          <CardContent>
-            {selectedDate ? (
-              selectedDateEntries.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedDateEntries.map((entry) => (
-                    <div key={entry.id} className="p-3 border rounded-lg">
-                      <h3 className="font-semibold">{entry.title}</h3>
-                      {entry.content && (
-                        <p className="text-sm text-muted-foreground mt-1">{entry.content}</p>
-                      )}
-                    </div>
-                  ))}
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" size="icon" onClick={() => navigateMonth('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <Select onValueChange={(value) => selectMonth(parseInt(value))}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder={months[currentDate.getMonth()]} />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((month, index) => (
+                  <SelectItem key={month} value={index.toString()}>
+                    {month}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" size="icon" onClick={() => navigateMonth('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-sales">${monthTotals.sales.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Sales Total</div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-delivery">${monthTotals.delivery.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Delivery Total</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="flex gap-6">
+          <div className="flex-1">
+            <div className="grid grid-cols-7 gap-1 mb-4">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="p-2 text-center font-medium text-muted-foreground">
+                  {day}
                 </div>
-              ) : (
-                <p className="text-muted-foreground">No entries for this date</p>
-              )
-            ) : (
-              <p className="text-muted-foreground">Select a date to view entries</p>
-            )}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {renderCalendarDays()}
+            </div>
+          </div>
+
+          {/* Weekly Totals */}
+          <div className="w-32 space-y-1">
+            <div className="p-2 text-center font-medium text-muted-foreground mb-4">
+              Weekly
+            </div>
+            {renderWeekTotals()}
+          </div>
+        </div>
       </div>
     </div>
+  );
+};
+
+interface DayCellProps {
+  day: number;
+  data: DayData;
+  onAddEntry: (day: number, amount: number, type: 'sales' | 'delivery', category: string) => void;
+}
+
+const DayCell = ({ day, data, onAddEntry }: DayCellProps) => {
+  const [salesAmount, setSalesAmount] = useState('');
+  const [deliveryAmount, setDeliveryAmount] = useState('');
+  const [showSalesCategory, setShowSalesCategory] = useState(false);
+  const [showDeliveryCategory, setShowDeliveryCategory] = useState(false);
+
+  const handleSalesSubmit = (amount: string) => {
+    const numAmount = parseFloat(amount);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setShowSalesCategory(true);
+    }
+  };
+
+  const handleDeliverySubmit = (amount: string) => {
+    const numAmount = parseFloat(amount);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setShowDeliveryCategory(true);
+    }
+  };
+
+  const submitSalesEntry = (category: string) => {
+    const amount = parseFloat(salesAmount);
+    onAddEntry(day, amount, 'sales', category);
+    setSalesAmount('');
+    setShowSalesCategory(false);
+  };
+
+  const submitDeliveryEntry = (category: string) => {
+    const amount = parseFloat(deliveryAmount);
+    onAddEntry(day, amount, 'delivery', category);
+    setDeliveryAmount('');
+    setShowDeliveryCategory(false);
+  };
+
+  return (
+    <Card className="h-32 p-2 relative overflow-hidden">
+      <div className="font-medium text-sm mb-1">{day}</div>
+      
+      {/* Daily Totals */}
+      <div className="absolute top-2 right-2 text-right">
+        <div className="text-xs font-semibold text-sales">${data.sales}</div>
+        <div className="text-xs font-semibold text-delivery">${data.delivery}</div>
+      </div>
+
+      {/* Input Fields */}
+      <div className="space-y-1 mt-4">
+        <div className="relative">
+          <Input
+            placeholder="Sold"
+            value={salesAmount}
+            onChange={(e) => setSalesAmount(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSalesSubmit(salesAmount)}
+            className="h-7 text-xs"
+          />
+          {showSalesCategory && (
+            <Select onValueChange={submitSalesEntry}>
+              <SelectTrigger className="h-6 text-xs absolute top-8 left-0 right-0 z-10">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Training">Training</SelectItem>
+                <SelectItem value="Coaching">Coaching</SelectItem>
+                <SelectItem value="Speaking">Speaking</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        <div className="relative">
+          <Input
+            placeholder="Delivered"
+            value={deliveryAmount}
+            onChange={(e) => setDeliveryAmount(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleDeliverySubmit(deliveryAmount)}
+            className="h-7 text-xs"
+          />
+          {showDeliveryCategory && (
+            <Select onValueChange={submitDeliveryEntry}>
+              <SelectTrigger className="h-6 text-xs absolute top-8 left-0 right-0 z-10">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Training">Training</SelectItem>
+                <SelectItem value="Coaching">Coaching</SelectItem>
+                <SelectItem value="Speaking">Speaking</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 };
 

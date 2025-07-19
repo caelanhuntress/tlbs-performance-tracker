@@ -9,7 +9,6 @@ import Data from "./pages/Data";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
-import { EntriesProvider } from "./context/EntriesContext";
 
 const queryClient = new QueryClient();
 
@@ -19,17 +18,15 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <EntriesProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Calendar />} />
-              <Route path="data" element={<Data />} />
-              <Route path="dashboard" element={<Dashboard />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </EntriesProvider>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Calendar />} />
+            <Route path="data" element={<Data />} />
+            <Route path="dashboard" element={<Dashboard />} />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
