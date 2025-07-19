@@ -314,7 +314,7 @@ const DayCell = ({ day, data, onAddEntry }: DayCellProps) => {
       <div className="space-y-1 mt-4">
         <div className="relative">
           <Input
-            placeholder="Amount Sold"
+            placeholder="Sold"
             value={salesAmount}
             onChange={(e) => setSalesAmount(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSalesSubmit(salesAmount)}
@@ -336,7 +336,7 @@ const DayCell = ({ day, data, onAddEntry }: DayCellProps) => {
 
         <div className="relative">
           <Input
-            placeholder="Amount Delivered"
+            placeholder="Delivered"
             value={deliveryAmount}
             onChange={(e) => setDeliveryAmount(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleDeliverySubmit(deliveryAmount)}
