@@ -244,7 +244,7 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {salesData.slice(-12).map((month, index) => (
+                    {salesData.slice(-12).reverse().map((month, index) => (
                       <tr key={index} className="border-b">
                         <td className="p-2">{month.month}</td>
                         <td className="text-right p-2">${month.Training.toLocaleString()}</td>
@@ -294,7 +294,7 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {deliveryData.slice(-12).map((month, index) => (
+                    {deliveryData.slice(-12).reverse().map((month, index) => (
                       <tr key={index} className="border-b">
                         <td className="p-2">{month.month}</td>
                         <td className="text-right p-2">${month.Training.toLocaleString()}</td>
