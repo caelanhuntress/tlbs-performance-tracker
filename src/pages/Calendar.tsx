@@ -37,10 +37,32 @@ interface DayData {
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [salesGoal, setSalesGoal] = useState<string>('');
-  const [deliveryGoal, setDeliveryGoal] = useState<string>('');
+  const [monthlyGoals, setMonthlyGoals] = useState<Record<string, { sales: string; delivery: string }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Get current month key for goals
+  const getMonthKey = (date: Date) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const currentMonthKey = getMonthKey(currentDate);
+  const currentGoals = monthlyGoals[currentMonthKey] || { sales: '', delivery: '' };
+
+  // Update goals for current month
+  const updateSalesGoal = (value: string) => {
+    setMonthlyGoals(prev => ({
+      ...prev,
+      [currentMonthKey]: { ...currentGoals, sales: value }
+    }));
+  };
+
+  const updateDeliveryGoal = (value: string) => {
+    setMonthlyGoals(prev => ({
+      ...prev,
+      [currentMonthKey]: { ...currentGoals, delivery: value }
+    }));
+  };
 
   // Fetch entries from Supabase
   const { data: entries = [], isLoading } = useQuery({
@@ -264,14 +286,14 @@ const Calendar = () => {
             <div className="flex items-center space-x-2">
               <Input
                 placeholder="Sales Goal"
-                value={salesGoal}
-                onChange={(e) => setSalesGoal(e.target.value)}
+                value={currentGoals.sales}
+                onChange={(e) => updateSalesGoal(e.target.value)}
                 className="w-32"
               />
               <Input
                 placeholder="Delivery Goal"
-                value={deliveryGoal}
-                onChange={(e) => setDeliveryGoal(e.target.value)}
+                value={currentGoals.delivery}
+                onChange={(e) => updateDeliveryGoal(e.target.value)}
                 className="w-32"
               />
             </div>
