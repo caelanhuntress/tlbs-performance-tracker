@@ -117,10 +117,7 @@ const Dashboard = () => {
     const values = data.map(d => d[category]).filter(v => v > 0);
     const total = values.reduce((sum, val) => sum + val, 0);
     const average = values.length > 0 ? total / values.length : 0;
-    const last12MonthsNonZero = data.slice(-12).filter(d => d[category] > 0);
-    const runningRate = last12MonthsNonZero.length > 0 
-      ? last12MonthsNonZero.reduce((sum, d) => sum + d[category], 0) / last12MonthsNonZero.length 
-      : 0;
+    const runningRate = data.slice(-12).reduce((sum, d) => sum + d[category], 0) / 12;
 
     return { total, average, runningRate };
   };
