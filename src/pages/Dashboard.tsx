@@ -5,6 +5,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
 } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+interface DbEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string | null;
+  date: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface Entry {
   id: string;
@@ -14,18 +26,30 @@ interface Entry {
   category: 'Training' | 'Coaching' | 'Speaking';
 }
 
-// Sample data - in a real app this would come from your data store
-const sampleEntries: Entry[] = [
-  { id: '1', date: '2024-01-15', amount: 2500, type: 'sales', category: 'Training' },
-  { id: '2', date: '2024-01-15', amount: 1800, type: 'delivery', category: 'Coaching' },
-  { id: '3', date: '2024-01-14', amount: 5000, type: 'sales', category: 'Speaking' },
-  { id: '4', date: '2024-02-10', amount: 3200, type: 'sales', category: 'Training' },
-  { id: '5', date: '2024-02-12', amount: 2100, type: 'delivery', category: 'Speaking' },
-  { id: '6', date: '2024-03-05', amount: 4500, type: 'sales', category: 'Coaching' },
-];
-
 const Dashboard = () => {
-  const [entries] = useState<Entry[]>(sampleEntries);
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['entries'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('entries')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching entries:', error);
+        throw error;
+      }
+      
+      return (data as DbEntry[]).map(entry => ({
+        id: entry.id,
+        date: entry.date,
+        amount: parseFloat(entry.content || '0'),
+        type: entry.title.toLowerCase().includes('sales') ? 'sales' as const : 'delivery' as const,
+        category: (entry.title.includes('Training') ? 'Training' : 
+                  entry.title.includes('Coaching') ? 'Coaching' : 'Speaking') as 'Training' | 'Coaching' | 'Speaking'
+      }));
+    },
+  });
   const [pieChartType, setPieChartType] = useState<'sales' | 'delivery'>('sales');
   const [pieChartRange, setPieChartRange] = useState('last-3-months');
 
