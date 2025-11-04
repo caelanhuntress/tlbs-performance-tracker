@@ -16,6 +16,7 @@ interface DbEntry {
   title: string;
   content: string | null;
   date: string;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,7 @@ interface Entry {
   category: 'Training' | 'Coaching' | 'Speaking';
   title: string;
   content?: string;
+  notes?: string | null;
   user_id: string;
 }
 
@@ -59,6 +61,7 @@ const Data = () => {
         category: entry.title.split(' - ')[1] as 'Training' | 'Coaching' | 'Speaking' || 'Training',
         title: entry.title,
         content: entry.content,
+        notes: entry.notes,
         user_id: entry.user_id
       }));
     },
@@ -88,7 +91,8 @@ const Data = () => {
       .update({
         date: editingEntry.date,
         title,
-        content: editingEntry.amount?.toString()
+        content: editingEntry.amount?.toString(),
+        notes: editingEntry.notes
       })
       .eq('id', editingId);
 
@@ -213,6 +217,7 @@ const Data = () => {
                     <TableHead>Type</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Notes</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -291,6 +296,20 @@ const Data = () => {
                           }`}>
                             ${entry.amount.toLocaleString()}
                           </span>
+                        )}
+                      </TableCell>
+                      
+                      <TableCell>
+                        {editingId === entry.id ? (
+                          <Input
+                            type="text"
+                            value={editingEntry.notes || ''}
+                            onChange={(e) => setEditingEntry(prev => ({ ...prev, notes: e.target.value }))}
+                            className="w-48"
+                            placeholder="Add notes..."
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">{entry.notes || '-'}</span>
                         )}
                       </TableCell>
                       
