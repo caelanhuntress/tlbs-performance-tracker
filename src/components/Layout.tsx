@@ -40,7 +40,7 @@ const Layout = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <BarChart3 className="h-8 w-8 text-performance" />
-              <h1 className="text-2xl font-bold text-foreground">TLBS Dashboard</h1>
+              <h1 className="text-2xl font-bold text-foreground">AI Training Dashboard</h1>
             </div>
 
             <div className="flex items-center space-x-4">
