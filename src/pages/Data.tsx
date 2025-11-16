@@ -4,11 +4,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { TagInput } from "@/components/TagInput";
 
 interface DbEntry {
   id: string;
@@ -17,6 +19,7 @@ interface DbEntry {
   content: string | null;
   date: string;
   notes: string | null;
+  tags: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +33,7 @@ interface Entry {
   title: string;
   content?: string;
   notes?: string | null;
+  tags: string[];
   user_id: string;
 }
 
@@ -62,6 +66,7 @@ const Data = () => {
         title: entry.title,
         content: entry.content,
         notes: entry.notes,
+        tags: entry.tags || [],
         user_id: entry.user_id
       }));
     },
@@ -92,7 +97,8 @@ const Data = () => {
         date: editingEntry.date,
         title,
         content: editingEntry.amount?.toString(),
-        notes: editingEntry.notes
+        notes: editingEntry.notes,
+        tags: editingEntry.tags || []
       })
       .eq('id', editingId);
 
@@ -218,6 +224,7 @@ const Data = () => {
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Notes</TableHead>
+                    <TableHead>Tags</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -310,6 +317,29 @@ const Data = () => {
                           />
                         ) : (
                           <span className="text-muted-foreground">{entry.notes || '-'}</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        {editingId === entry.id ? (
+                          <div className="min-w-[200px]">
+                            <TagInput
+                              tags={editingEntry.tags || []}
+                              onChange={(tags) => setEditingEntry(prev => ({ ...prev, tags }))}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {entry.tags.length > 0 ? (
+                              entry.tags.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       
