@@ -330,7 +330,7 @@ const Data = () => {
                           </div>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {entry.tags.length > 0 ? (
+                            {entry.tags && entry.tags.length > 0 ? (
                               entry.tags.map(tag => (
                                 <Badge key={tag} variant="secondary" className="text-xs">
                                   {tag}
