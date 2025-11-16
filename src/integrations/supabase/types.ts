@@ -50,6 +50,36 @@ export type Database = {
         }
         Relationships: []
       }
+      metrics: {
+        Row: {
+          count: number
+          created_at: string
+          date: string
+          id: string
+          metric_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          date?: string
+          id?: string
+          metric_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          date?: string
+          id?: string
+          metric_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MetricsTracker } from "@/components/MetricsTracker";
 
 interface DbEntry {
   id: string;
@@ -356,6 +357,11 @@ const Calendar = () => {
             </div>
             {renderWeekTotals()}
           </div>
+        </div>
+
+        {/* Lead Metrics Section */}
+        <div className="mt-8">
+          <MetricsTracker />
         </div>
       </div>
     </div>
