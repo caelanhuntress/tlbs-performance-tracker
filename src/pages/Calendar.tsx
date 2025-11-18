@@ -26,8 +26,8 @@ interface Entry {
   id: string;
   date: string;
   amount: number;
-  type: 'sales' | 'delivery';
-  category: 'Training' | 'Coaching' | 'Speaking';
+  type: 'sales' | 'delivery' | 'events';
+  category: 'Training' | 'Coaching' | 'Speaking' | 'Tickets' | 'Workshops' | 'Buskouts';
   title: string;
   content?: string;
   user_id: string;
@@ -36,6 +36,7 @@ interface Entry {
 interface DayData {
   sales: number;
   delivery: number;
+  events: number;
 }
 
 const Calendar = () => {
@@ -63,16 +64,28 @@ const Calendar = () => {
         throw error;
       }
       
-      return (data as DbEntry[]).map(entry => ({
-        id: entry.id,
-        date: entry.date,
-        amount: parseFloat(entry.content || '0'),
-        type: entry.title.toLowerCase().includes('sales') ? 'sales' as const : 'delivery' as const,
-        category: entry.title.split(' - ')[1] as 'Training' | 'Coaching' | 'Speaking' || 'Training',
-        title: entry.title,
-        content: entry.content,
-        user_id: entry.user_id
-      }));
+      return (data as DbEntry[]).map(entry => {
+        const title = entry.title.toLowerCase();
+        let type: 'sales' | 'delivery' | 'events';
+        if (title.includes('sales')) {
+          type = 'sales';
+        } else if (title.includes('events')) {
+          type = 'events';
+        } else {
+          type = 'delivery';
+        }
+        
+        return {
+          id: entry.id,
+          date: entry.date,
+          amount: parseFloat(entry.content || '0'),
+          type,
+          category: entry.title.split(' - ')[1] as any || 'Training',
+          title: entry.title,
+          content: entry.content,
+          user_id: entry.user_id
+        };
+      });
     },
   });
 
@@ -103,13 +116,15 @@ const Calendar = () => {
     
     return {
       sales: dayEntries.filter(e => e.type === 'sales').reduce((sum, e) => sum + e.amount, 0),
-      delivery: dayEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0)
+      delivery: dayEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0),
+      events: dayEntries.filter(e => e.type === 'events').reduce((sum, e) => sum + e.amount, 0)
     };
   };
 
   const getWeekData = (weekStart: number): DayData => {
     let sales = 0;
     let delivery = 0;
+    let events = 0;
     
     for (let i = 0; i < 7; i++) {
       const day = weekStart + i;
@@ -117,10 +132,11 @@ const Calendar = () => {
         const dayData = getDayData(day);
         sales += dayData.sales;
         delivery += dayData.delivery;
+        events += dayData.events;
       }
     }
     
-    return { sales, delivery };
+    return { sales, delivery, events };
   };
 
   const getMonthTotals = (): DayData => {
@@ -133,11 +149,12 @@ const Calendar = () => {
 
     return {
       sales: monthEntries.filter(e => e.type === 'sales').reduce((sum, e) => sum + e.amount, 0),
-      delivery: monthEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0)
+      delivery: monthEntries.filter(e => e.type === 'delivery').reduce((sum, e) => sum + e.amount, 0),
+      events: monthEntries.filter(e => e.type === 'events').reduce((sum, e) => sum + e.amount, 0)
     };
   };
 
-  const addEntry = async (day: number, amount: number, type: 'sales' | 'delivery', category: string) => {
+  const addEntry = async (day: number, amount: number, type: 'sales' | 'delivery' | 'events', category: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -150,7 +167,8 @@ const Calendar = () => {
     }
 
     const dateString = getDateString(day);
-    const title = `${type === 'sales' ? 'Sales' : 'Delivery'} - ${category}`;
+    const titlePrefix = type === 'sales' ? 'Sales' : type === 'events' ? 'Events' : 'Delivery';
+    const title = `${titlePrefix} - ${category}`;
     
     const { error } = await (supabase as any)
       .from('entries')
@@ -174,9 +192,10 @@ const Calendar = () => {
     // Refresh the entries
     queryClient.invalidateQueries({ queryKey: ['entries'] });
     
+    const typeLabel = type === 'sales' ? 'Sales' : type === 'events' ? 'Events' : 'Delivery';
     toast({
       title: "Entry Added",
-      description: `${type === 'sales' ? 'Sales' : 'Delivery'} of $${amount} added for ${category}`,
+      description: `${typeLabel} of $${amount} added for ${category}`,
     });
   };
 
@@ -224,7 +243,7 @@ const Calendar = () => {
           />
         );
       } else {
-        days.push(<div key={i} className="h-32"></div>);
+        days.push(<div key={i} className="h-40"></div>);
       }
     }
 
@@ -245,6 +264,7 @@ const Calendar = () => {
           <div className="space-y-1">
             <div className="text-sales font-semibold">${convertAmount(weekData.sales).toLocaleString()}</div>
             <div className="text-delivery font-semibold">${convertAmount(weekData.delivery).toLocaleString()}</div>
+            <div className="text-accent font-semibold">${convertAmount(weekData.events).toLocaleString()}</div>
           </div>
         </Card>
       );
@@ -311,6 +331,10 @@ const Calendar = () => {
               <div className="text-2xl font-bold text-delivery">${convertAmount(monthTotals.delivery).toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Delivery Total</div>
             </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-accent">${convertAmount(monthTotals.events).toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Events Total</div>
+            </div>
           </div>
         </div>
 
@@ -350,74 +374,97 @@ const Calendar = () => {
 interface DayCellProps {
   day: number;
   data: DayData;
-  onAddEntry: (day: number, amount: number, type: 'sales' | 'delivery', category: string) => void;
+  onAddEntry: (day: number, amount: number, type: 'sales' | 'delivery' | 'events', category: string) => void;
   isGrossView: boolean;
 }
 
 const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
   const [cashAmount, setCashAmount] = useState('');
-  const [showTypeSelect, setShowTypeSelect] = useState(false);
-  const [selectedType, setSelectedType] = useState<'sales' | 'delivery' | null>(null);
-  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [showCashTypeSelect, setShowCashTypeSelect] = useState(false);
+  const [cashSelectedType, setCashSelectedType] = useState<'sales' | 'delivery' | null>(null);
+  const [showCashCategoryMenu, setShowCashCategoryMenu] = useState(false);
+  
+  const [eventsAmount, setEventsAmount] = useState('');
+  const [showEventsCategoryMenu, setShowEventsCategoryMenu] = useState(false);
   
   const convertAmount = (amount: number) => {
     return isGrossView ? amount * 1.66 : amount;
   };
 
-  const handleAmountSubmit = (amount: string) => {
+  const handleCashAmountSubmit = (amount: string) => {
     const numAmount = parseFloat(amount);
     if (!isNaN(numAmount) && numAmount > 0) {
-      setShowTypeSelect(true);
+      setShowCashTypeSelect(true);
     }
   };
 
-  const handleTypeSelect = (type: 'sales' | 'delivery') => {
-    setSelectedType(type);
-    setShowTypeSelect(false);
-    setShowCategoryMenu(true);
+  const handleCashTypeSelect = (type: 'sales' | 'delivery') => {
+    setCashSelectedType(type);
+    setShowCashTypeSelect(false);
+    setShowCashCategoryMenu(true);
   };
 
-  const handleCategorySelect = (category: string) => {
-    if (selectedType) {
+  const handleCashCategorySelect = (category: string) => {
+    if (cashSelectedType) {
       const amount = parseFloat(cashAmount);
-      onAddEntry(day, amount, selectedType, category);
+      onAddEntry(day, amount, cashSelectedType, category);
       setCashAmount('');
-      setSelectedType(null);
-      setShowCategoryMenu(false);
+      setCashSelectedType(null);
+      setShowCashCategoryMenu(false);
     }
   };
 
-  const handleCancel = () => {
-    setShowTypeSelect(false);
-    setShowCategoryMenu(false);
-    setSelectedType(null);
+  const handleCashCancel = () => {
+    setShowCashTypeSelect(false);
+    setShowCashCategoryMenu(false);
+    setCashSelectedType(null);
+  };
+
+  const handleEventsAmountSubmit = (amount: string) => {
+    const numAmount = parseFloat(amount);
+    if (!isNaN(numAmount) && numAmount > 0) {
+      setShowEventsCategoryMenu(true);
+    }
+  };
+
+  const handleEventsCategorySelect = (category: string) => {
+    const amount = parseFloat(eventsAmount);
+    onAddEntry(day, amount, 'events', category);
+    setEventsAmount('');
+    setShowEventsCategoryMenu(false);
+  };
+
+  const handleEventsCancel = () => {
+    setShowEventsCategoryMenu(false);
   };
 
   return (
-    <Card className="h-32 p-2 relative overflow-visible">
+    <Card className="h-40 p-2 relative overflow-visible">
       <div className="font-medium text-sm mb-1">{day}</div>
       
       {/* Daily Totals */}
       <div className="absolute top-2 right-2 text-right">
         <div className="text-xs font-semibold text-sales">${convertAmount(data.sales).toFixed(0)}</div>
         <div className="text-xs font-semibold text-delivery">${convertAmount(data.delivery).toFixed(0)}</div>
+        <div className="text-xs font-semibold text-accent">${convertAmount(data.events).toFixed(0)}</div>
       </div>
 
-      {/* Input Field */}
-      <div className="mt-4">
+      {/* Input Fields */}
+      <div className="mt-4 space-y-1">
+        {/* Cash Input */}
         <div className="relative">
           <Input
             placeholder="Cash"
             value={cashAmount}
             onChange={(e) => setCashAmount(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAmountSubmit(cashAmount)}
+            onKeyPress={(e) => e.key === 'Enter' && handleCashAmountSubmit(cashAmount)}
             className="h-7 text-xs"
-            disabled={showTypeSelect || showCategoryMenu}
+            disabled={showCashTypeSelect || showCashCategoryMenu}
           />
           
-          {/* Type Selection Dropdown */}
-          {showTypeSelect && (
-            <Select onValueChange={(value) => handleTypeSelect(value as 'sales' | 'delivery')}>
+          {/* Cash Type Selection Dropdown */}
+          {showCashTypeSelect && (
+            <Select onValueChange={(value) => handleCashTypeSelect(value as 'sales' | 'delivery')}>
               <SelectTrigger className="h-7 text-xs absolute top-8 left-0 right-0 z-50 bg-popover">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -428,8 +475,8 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
             </Select>
           )}
 
-          {/* Category Menu */}
-          {showCategoryMenu && (
+          {/* Cash Category Menu */}
+          {showCashCategoryMenu && (
             <div className="absolute top-0 left-full ml-2 bg-popover border border-border rounded-md shadow-lg p-2 z-50 w-32">
               <div className="text-xs font-medium mb-2 text-foreground">Category</div>
               <div className="space-y-1">
@@ -437,7 +484,7 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs h-7"
-                  onClick={() => handleCategorySelect('Training')}
+                  onClick={() => handleCashCategorySelect('Training')}
                 >
                   Training
                 </Button>
@@ -445,7 +492,7 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs h-7"
-                  onClick={() => handleCategorySelect('Coaching')}
+                  onClick={() => handleCashCategorySelect('Coaching')}
                 >
                   Coaching
                 </Button>
@@ -453,7 +500,7 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs h-7"
-                  onClick={() => handleCategorySelect('Speaking')}
+                  onClick={() => handleCashCategorySelect('Speaking')}
                 >
                   Speaking
                 </Button>
@@ -461,7 +508,60 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs h-7 text-muted-foreground"
-                  onClick={handleCancel}
+                  onClick={handleCashCancel}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Events Input */}
+        <div className="relative">
+          <Input
+            placeholder="Events"
+            value={eventsAmount}
+            onChange={(e) => setEventsAmount(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleEventsAmountSubmit(eventsAmount)}
+            className="h-7 text-xs"
+            disabled={showEventsCategoryMenu}
+          />
+
+          {/* Events Category Menu */}
+          {showEventsCategoryMenu && (
+            <div className="absolute top-0 left-full ml-2 bg-popover border border-border rounded-md shadow-lg p-2 z-50 w-32">
+              <div className="text-xs font-medium mb-2 text-foreground">Category</div>
+              <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleEventsCategorySelect('Tickets')}
+                >
+                  Tickets
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleEventsCategorySelect('Workshops')}
+                >
+                  Workshops
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleEventsCategorySelect('Buskouts')}
+                >
+                  Buskouts
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7 text-muted-foreground"
+                  onClick={handleEventsCancel}
                 >
                   Cancel
                 </Button>
