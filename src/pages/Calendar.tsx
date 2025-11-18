@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,31 +40,13 @@ interface DayData {
 
 const Calendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [monthlyGoals, setMonthlyGoals] = useState<Record<string, { sales: string; delivery: string }>>({});
+  const [isGrossView, setIsGrossView] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get current month key for goals
-  const getMonthKey = (date: Date) => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
-
-  const currentMonthKey = getMonthKey(currentDate);
-  const currentGoals = monthlyGoals[currentMonthKey] || { sales: '', delivery: '' };
-
-  // Update goals for current month
-  const updateSalesGoal = (value: string) => {
-    setMonthlyGoals(prev => ({
-      ...prev,
-      [currentMonthKey]: { ...currentGoals, sales: value }
-    }));
-  };
-
-  const updateDeliveryGoal = (value: string) => {
-    setMonthlyGoals(prev => ({
-      ...prev,
-      [currentMonthKey]: { ...currentGoals, delivery: value }
-    }));
+  // Convert amount based on gross/net view
+  const convertAmount = (amount: number) => {
+    return isGrossView ? amount * 1.66 : amount;
   };
 
   // Fetch entries from Supabase
@@ -236,6 +220,7 @@ const Calendar = () => {
             day={day}
             data={dayData}
             onAddEntry={addEntry}
+            isGrossView={isGrossView}
           />
         );
       } else {
@@ -258,8 +243,8 @@ const Calendar = () => {
         <Card key={week} className="p-4 bg-performance-light">
           <div className="text-sm font-medium text-center mb-2">Week {week + 1}</div>
           <div className="space-y-1">
-            <div className="text-sales font-semibold">${weekData.sales.toLocaleString()}</div>
-            <div className="text-delivery font-semibold">${weekData.delivery.toLocaleString()}</div>
+            <div className="text-sales font-semibold">${convertAmount(weekData.sales).toLocaleString()}</div>
+            <div className="text-delivery font-semibold">${convertAmount(weekData.delivery).toLocaleString()}</div>
           </div>
         </Card>
       );
@@ -283,21 +268,15 @@ const Calendar = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Input
-                placeholder="Sales Goal"
-                value={currentGoals.sales}
-                onChange={(e) => updateSalesGoal(e.target.value)}
-                className="w-32"
-              />
-              <Input
-                placeholder="Delivery Goal"
-                value={currentGoals.delivery}
-                onChange={(e) => updateDeliveryGoal(e.target.value)}
-                className="w-32"
-              />
-            </div>
+          <div className="flex items-center space-x-2">
+            <Switch 
+              id="gross-net-toggle" 
+              checked={isGrossView} 
+              onCheckedChange={setIsGrossView}
+            />
+            <Label htmlFor="gross-net-toggle" className="text-sm font-medium">
+              {isGrossView ? 'Gross' : 'Net'}
+            </Label>
           </div>
 
           <div className="flex items-center space-x-4">
@@ -325,11 +304,11 @@ const Calendar = () => {
 
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <div className="text-2xl font-bold text-sales">${monthTotals.sales.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-sales">${convertAmount(monthTotals.sales).toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Sales Total</div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-delivery">${monthTotals.delivery.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-delivery">${convertAmount(monthTotals.delivery).toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Delivery Total</div>
             </div>
           </div>
@@ -372,13 +351,18 @@ interface DayCellProps {
   day: number;
   data: DayData;
   onAddEntry: (day: number, amount: number, type: 'sales' | 'delivery', category: string) => void;
+  isGrossView: boolean;
 }
 
-const DayCell = ({ day, data, onAddEntry }: DayCellProps) => {
+const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
   const [salesAmount, setSalesAmount] = useState('');
   const [deliveryAmount, setDeliveryAmount] = useState('');
   const [showSalesCategory, setShowSalesCategory] = useState(false);
   const [showDeliveryCategory, setShowDeliveryCategory] = useState(false);
+  
+  const convertAmount = (amount: number) => {
+    return isGrossView ? amount * 1.66 : amount;
+  };
 
   const handleSalesSubmit = (amount: string) => {
     const numAmount = parseFloat(amount);
@@ -414,8 +398,8 @@ const DayCell = ({ day, data, onAddEntry }: DayCellProps) => {
       
       {/* Daily Totals */}
       <div className="absolute top-2 right-2 text-right">
-        <div className="text-xs font-semibold text-sales">${data.sales}</div>
-        <div className="text-xs font-semibold text-delivery">${data.delivery}</div>
+        <div className="text-xs font-semibold text-sales">${convertAmount(data.sales).toFixed(0)}</div>
+        <div className="text-xs font-semibold text-delivery">${convertAmount(data.delivery).toFixed(0)}</div>
       </div>
 
       {/* Input Fields */}
