@@ -355,45 +355,46 @@ interface DayCellProps {
 }
 
 const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
-  const [salesAmount, setSalesAmount] = useState('');
-  const [deliveryAmount, setDeliveryAmount] = useState('');
-  const [showSalesCategory, setShowSalesCategory] = useState(false);
-  const [showDeliveryCategory, setShowDeliveryCategory] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [showTypeSelect, setShowTypeSelect] = useState(false);
+  const [selectedType, setSelectedType] = useState<'sales' | 'delivery' | null>(null);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   
   const convertAmount = (amount: number) => {
     return isGrossView ? amount * 1.66 : amount;
   };
 
-  const handleSalesSubmit = (amount: string) => {
+  const handleAmountSubmit = (amount: string) => {
     const numAmount = parseFloat(amount);
     if (!isNaN(numAmount) && numAmount > 0) {
-      setShowSalesCategory(true);
+      setShowTypeSelect(true);
     }
   };
 
-  const handleDeliverySubmit = (amount: string) => {
-    const numAmount = parseFloat(amount);
-    if (!isNaN(numAmount) && numAmount > 0) {
-      setShowDeliveryCategory(true);
+  const handleTypeSelect = (type: 'sales' | 'delivery') => {
+    setSelectedType(type);
+    setShowTypeSelect(false);
+    setShowCategoryMenu(true);
+  };
+
+  const handleCategorySelect = (category: string) => {
+    if (selectedType) {
+      const amount = parseFloat(cashAmount);
+      onAddEntry(day, amount, selectedType, category);
+      setCashAmount('');
+      setSelectedType(null);
+      setShowCategoryMenu(false);
     }
   };
 
-  const submitSalesEntry = (category: string) => {
-    const amount = parseFloat(salesAmount);
-    onAddEntry(day, amount, 'sales', category);
-    setSalesAmount('');
-    setShowSalesCategory(false);
-  };
-
-  const submitDeliveryEntry = (category: string) => {
-    const amount = parseFloat(deliveryAmount);
-    onAddEntry(day, amount, 'delivery', category);
-    setDeliveryAmount('');
-    setShowDeliveryCategory(false);
+  const handleCancel = () => {
+    setShowTypeSelect(false);
+    setShowCategoryMenu(false);
+    setSelectedType(null);
   };
 
   return (
-    <Card className="h-32 p-2 relative overflow-hidden">
+    <Card className="h-32 p-2 relative overflow-visible">
       <div className="font-medium text-sm mb-1">{day}</div>
       
       {/* Daily Totals */}
@@ -402,49 +403,70 @@ const DayCell = ({ day, data, onAddEntry, isGrossView }: DayCellProps) => {
         <div className="text-xs font-semibold text-delivery">${convertAmount(data.delivery).toFixed(0)}</div>
       </div>
 
-      {/* Input Fields */}
-      <div className="space-y-1 mt-4">
+      {/* Input Field */}
+      <div className="mt-4">
         <div className="relative">
           <Input
-            placeholder="Sold"
-            value={salesAmount}
-            onChange={(e) => setSalesAmount(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSalesSubmit(salesAmount)}
+            placeholder="Cash"
+            value={cashAmount}
+            onChange={(e) => setCashAmount(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAmountSubmit(cashAmount)}
             className="h-7 text-xs"
+            disabled={showTypeSelect || showCategoryMenu}
           />
-          {showSalesCategory && (
-            <Select onValueChange={submitSalesEntry}>
-              <SelectTrigger className="h-6 text-xs absolute top-8 left-0 right-0 z-10">
-                <SelectValue placeholder="Category" />
+          
+          {/* Type Selection Dropdown */}
+          {showTypeSelect && (
+            <Select onValueChange={(value) => handleTypeSelect(value as 'sales' | 'delivery')}>
+              <SelectTrigger className="h-7 text-xs absolute top-8 left-0 right-0 z-50 bg-popover">
+                <SelectValue placeholder="Type" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Training">Training</SelectItem>
-                <SelectItem value="Coaching">Coaching</SelectItem>
-                <SelectItem value="Speaking">Speaking</SelectItem>
+              <SelectContent className="z-50 bg-popover">
+                <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="delivery">Delivery</SelectItem>
               </SelectContent>
             </Select>
           )}
-        </div>
 
-        <div className="relative">
-          <Input
-            placeholder="Delivered"
-            value={deliveryAmount}
-            onChange={(e) => setDeliveryAmount(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleDeliverySubmit(deliveryAmount)}
-            className="h-7 text-xs"
-          />
-          {showDeliveryCategory && (
-            <Select onValueChange={submitDeliveryEntry}>
-              <SelectTrigger className="h-6 text-xs absolute top-8 left-0 right-0 z-10">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Training">Training</SelectItem>
-                <SelectItem value="Coaching">Coaching</SelectItem>
-                <SelectItem value="Speaking">Speaking</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Category Menu */}
+          {showCategoryMenu && (
+            <div className="absolute top-0 left-full ml-2 bg-popover border border-border rounded-md shadow-lg p-2 z-50 w-32">
+              <div className="text-xs font-medium mb-2 text-foreground">Category</div>
+              <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleCategorySelect('Training')}
+                >
+                  Training
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleCategorySelect('Coaching')}
+                >
+                  Coaching
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7"
+                  onClick={() => handleCategorySelect('Speaking')}
+                >
+                  Speaking
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-7 text-muted-foreground"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </div>
